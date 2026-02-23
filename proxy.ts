@@ -2,7 +2,9 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Routes that require authentication
-const PROTECTED_ROUTES = ["/groups", "/markets", "/invite"];
+// /invite is intentionally NOT protected — the page handles auth inline
+// so unauthenticated users can preview the invite before signing in.
+const PROTECTED_ROUTES = ["/groups", "/markets"];
 
 export async function proxy(request: NextRequest) {
   // If Supabase isn't configured yet, let all requests through (dev scaffold mode)

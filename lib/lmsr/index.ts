@@ -1,97 +1,100 @@
 // ============================================================
-// LMSR (Logarithmic Market Scoring Rule) engine
-// Full implementation in Phase 2.
-// Uses Decimal.js for precision.
+// LMSR (Logarithmic Market Scoring Rule) pricing engine
+// Uses Decimal.js (precision=28) to prevent float drift.
+//
+// Cost function:  C(q_yes, q_no) = b * ln(e^(q_yes/b) + e^(q_no/b))
+// Price YES:      e^(q_yes/b) / (e^(q_yes/b) + e^(q_no/b))
+// Price NO:       1 - priceYes
 // ============================================================
 
 import Decimal from "decimal.js";
 
-// Set global precision high enough for financial calculations
 Decimal.set({ precision: 28, rounding: Decimal.ROUND_HALF_UP });
 
 export type LMSRState = {
-  b: number;    // liquidity parameter
-  q_yes: number;
-  q_no: number;
+  b: number | string;
+  q_yes: number | string;
+  q_no: number | string;
 };
 
-/**
- * Cost function: C(q) = b * ln(exp(q_yes/b) + exp(q_no/b))
- */
-export function cost(state: LMSRState): Decimal {
-  const b = new Decimal(state.b);
-  const qy = new Decimal(state.q_yes);
-  const qn = new Decimal(state.q_no);
-
-  return b.mul(
-    Decimal.exp(qy.div(b)).plus(Decimal.exp(qn.div(b))).ln()
-  );
+function d(x: number | string): Decimal {
+  return new Decimal(x);
 }
 
-/**
- * Price of YES shares: exp(q_yes/b) / (exp(q_yes/b) + exp(q_no/b))
- */
-export function priceYes(state: LMSRState): Decimal {
-  const b = new Decimal(state.b);
-  const qy = new Decimal(state.q_yes);
-  const qn = new Decimal(state.q_no);
+/** LMSR cost function C(q_yes, q_no) */
+export function cost(state: LMSRState): Decimal {
+  const b = d(state.b);
+  const ey = d(state.q_yes).div(b).exp();
+  const en = d(state.q_no).div(b).exp();
+  return b.mul(ey.plus(en).ln());
+}
 
-  const ey = Decimal.exp(qy.div(b));
-  const en = Decimal.exp(qn.div(b));
+/** Current YES probability / price (0–1) */
+export function priceYes(state: LMSRState): Decimal {
+  const b = d(state.b);
+  const ey = d(state.q_yes).div(b).exp();
+  const en = d(state.q_no).div(b).exp();
   return ey.div(ey.plus(en));
 }
 
-/**
- * Price of NO shares: 1 - priceYes
- */
+/** Current NO probability / price (0–1) */
 export function priceNo(state: LMSRState): Decimal {
-  return new Decimal(1).minus(priceYes(state));
+  return d(1).minus(priceYes(state));
 }
 
-/**
- * Cost of buying `shares` YES shares given current state.
- * costToBuy = C(q_yes + shares, q_no) - C(q_yes, q_no)
- */
-export function costToBuyYes(state: LMSRState, shares: number): Decimal {
-  const after = { ...state, q_yes: state.q_yes + shares };
+/** Credits required to buy `shares` YES shares */
+export function costToBuyYes(state: LMSRState, shares: number | string): Decimal {
+  const after: LMSRState = {
+    ...state,
+    q_yes: d(state.q_yes).plus(d(shares)).toNumber(),
+  };
+  return cost(after).minus(cost(state));
+}
+
+/** Credits required to buy `shares` NO shares */
+export function costToBuyNo(state: LMSRState, shares: number | string): Decimal {
+  const after: LMSRState = {
+    ...state,
+    q_no: d(state.q_no).plus(d(shares)).toNumber(),
+  };
   return cost(after).minus(cost(state));
 }
 
 /**
- * Cost of buying `shares` NO shares given current state.
- */
-export function costToBuyNo(state: LMSRState, shares: number): Decimal {
-  const after = { ...state, q_no: state.q_no + shares };
-  return cost(after).minus(cost(state));
-}
-
-/**
- * Binary search: how many shares can you buy with `spend` credits?
- * Returns shares as a Decimal.
- * Phase 2 will wire this up with full validation.
+ * Binary search: how many shares can you buy with exactly `spend` credits?
+ *
+ * Uses the fact that cost is strictly monotone increasing in shares,
+ * so binary search converges reliably.
  */
 export function sharesForSpend(
   state: LMSRState,
   outcome: "YES" | "NO",
-  spend: number,
-  tolerance = 1e-9
+  spend: number | string,
+  maxIter = 100
 ): Decimal {
-  const spendD = new Decimal(spend);
+  const spendD = d(spend);
+  if (spendD.lte(0)) return d(0);
+
   const costFn =
     outcome === "YES"
-      ? (s: number) => costToBuyYes(state, s)
-      : (s: number) => costToBuyNo(state, s);
+      ? (s: Decimal) => costToBuyYes(state, s.toNumber())
+      : (s: Decimal) => costToBuyNo(state, s.toNumber());
 
-  let lo = 0;
-  let hi = spend / 0.001; // upper bound: can't get more shares than 1/min_price
-  const MAX_ITER = 100;
+  // Upper bound: at current price, shares = spend / price (price only increases)
+  const currentPrice =
+    outcome === "YES" ? priceYes(state) : priceNo(state);
+  const priceSafe = currentPrice.lt("0.001") ? d("0.001") : currentPrice;
+  let lo = d(0);
+  let hi = spendD.div(priceSafe).mul("1.5"); // 1.5× headroom
 
-  for (let i = 0; i < MAX_ITER; i++) {
-    const mid = (lo + hi) / 2;
+  for (let i = 0; i < maxIter; i++) {
+    const mid = lo.plus(hi).div(2);
     const c = costFn(mid);
-    if (c.minus(spendD).abs().toNumber() < tolerance) {
-      return new Decimal(mid);
-    }
+    const diff = c.minus(spendD).abs();
+
+    // Converged when cost difference < 1e-9 credits
+    if (diff.lt("1e-9")) return mid;
+
     if (c.lt(spendD)) {
       lo = mid;
     } else {
@@ -99,5 +102,25 @@ export function sharesForSpend(
     }
   }
 
-  return new Decimal(lo);
+  return lo;
+}
+
+/**
+ * New q_yes / q_no after a trade (for atomic DB update).
+ */
+export function newQValues(
+  state: LMSRState,
+  outcome: "YES" | "NO",
+  shares: Decimal
+): { q_yes: Decimal; q_no: Decimal } {
+  if (outcome === "YES") {
+    return {
+      q_yes: d(state.q_yes).plus(shares),
+      q_no: d(state.q_no),
+    };
+  }
+  return {
+    q_yes: d(state.q_yes),
+    q_no: d(state.q_no).plus(shares),
+  };
 }

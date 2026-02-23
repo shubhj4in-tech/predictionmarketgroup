@@ -1,7 +1,58 @@
-// POST /api/invites — create invite link for a group
-// Phase 5 implementation
 import { NextResponse } from "next/server";
+import { requireUser, checkMembership, forbidden, badRequest } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/service";
+import crypto from "crypto";
 
-export async function POST() {
-  return NextResponse.json({ message: "Phase 5: POST /api/invites" }, { status: 501 });
+// POST /api/invites — create an invite link (admin only)
+export async function POST(request: Request) {
+  const { user, error } = await requireUser();
+  if (error) return error;
+
+  const body = await request.json().catch(() => null);
+  if (!body?.group_id) return badRequest("group_id is required");
+
+  const member = await checkMembership(body.group_id, user.id);
+  if (!member) return forbidden();
+  if (member.role !== "admin") {
+    return NextResponse.json(
+      { error: "Only admins can create invite links" },
+      { status: 403 }
+    );
+  }
+
+  const token = crypto.randomBytes(24).toString("base64url");
+  const expiresInHours =
+    typeof body.expires_in_hours === "number" ? body.expires_in_hours : null;
+  const expiresAt = expiresInHours
+    ? new Date(Date.now() + expiresInHours * 3600 * 1000).toISOString()
+    : null;
+  const maxUses =
+    typeof body.max_uses === "number" && body.max_uses > 0
+      ? body.max_uses
+      : null;
+
+  const supabase = createServiceClient();
+
+  const { data: invite, error: dbErr } = await supabase
+    .from("group_invites")
+    .insert({
+      group_id: body.group_id,
+      token,
+      created_by: user.id,
+      expires_at: expiresAt,
+      max_uses: maxUses,
+    })
+    .select("token, expires_at")
+    .single();
+
+  if (dbErr || !invite) {
+    return NextResponse.json({ error: "Failed to create invite" }, { status: 500 });
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  return NextResponse.json({
+    token: invite.token,
+    invite_url: `${appUrl}/invite/${invite.token}`,
+    expires_at: invite.expires_at,
+  });
 }
