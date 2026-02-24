@@ -146,13 +146,13 @@ export default function GroupsPage() {
               <Link
                 key={g.id}
                 href={`/groups/${g.id}`}
-                className={`flex items-center justify-between px-4 py-3.5 hover:bg-[#111] transition-colors ${
+                className={`flex items-center justify-between px-4 py-4 hover:bg-[#111] transition-colors ${
                   i !== 0 ? "border-t border-[#1e1e1e]" : ""
                 }`}
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-white truncate">{g.name}</p>
+                    <p className="text-base font-semibold text-white truncate">{g.name}</p>
                     {g.role === "admin" && (
                       <span className="text-[10px] text-[#00d4a3] font-mono border border-[#00d4a3]/30 px-1.5 py-0.5 rounded">
                         ADMIN
