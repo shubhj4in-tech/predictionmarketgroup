@@ -29,14 +29,17 @@ export async function GET() {
   }
 
   type GroupRow = { id: string; name: string; description: string | null; created_at: string };
-  // Supabase returns embedded joins as arrays when using select(); cast needed
-  type RawMember = { role: string; joined_at: string; groups: GroupRow[] | null };
+  // Supabase returns many-to-one joins as an object, not an array
+  type RawMember = { role: string; joined_at: string; groups: GroupRow | GroupRow[] | null };
   const rows = (data ?? []) as unknown as RawMember[];
 
+  const extractGroup = (m: RawMember): GroupRow | null => {
+    if (!m.groups) return null;
+    return Array.isArray(m.groups) ? (m.groups[0] ?? null) : m.groups;
+  };
+
   // Count members per group
-  const groupIds = rows
-    .map((m) => (Array.isArray(m.groups) ? m.groups[0]?.id : undefined))
-    .filter(Boolean) as string[];
+  const groupIds = rows.map((m) => extractGroup(m)?.id).filter(Boolean) as string[];
 
   const memberCounts: Record<string, number> = {};
   if (groupIds.length > 0) {
@@ -49,17 +52,20 @@ export async function GET() {
     }
   }
 
-  const groups = rows.map((m) => {
-    const g = Array.isArray(m.groups) ? m.groups[0] ?? null : null;
-    return {
-      id: g?.id,
-      name: g?.name,
-      description: g?.description ?? null,
-      member_count: memberCounts[g?.id ?? ""] ?? 0,
-      created_at: g?.created_at,
-      role: m.role,
-    };
-  });
+  const groups = rows
+    .map((m) => {
+      const g = extractGroup(m);
+      if (!g?.id) return null;
+      return {
+        id: g.id,
+        name: g.name,
+        description: g.description ?? null,
+        member_count: memberCounts[g.id] ?? 0,
+        created_at: g.created_at,
+        role: m.role,
+      };
+    })
+    .filter(Boolean);
 
   return NextResponse.json({ groups });
 }
