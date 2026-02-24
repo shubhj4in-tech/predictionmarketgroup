@@ -44,19 +44,25 @@ export async function GET(
     .select("user_id, market_id")
     .in("user_id", userIds);
 
-  // Get user emails from auth.users via service client
-  // Supabase doesn't expose auth.users via the JS client directly,
-  // so we use the admin API
-  const userEmails: Record<string, string> = {};
+  // Get display names from profiles, fall back to email, then truncated ID
+  const displayNames: Record<string, string> = {};
+  const { data: profileRows } = await supabase
+    .from("profiles")
+    .select("id, display_name, username")
+    .in("id", userIds);
+  for (const p of profileRows ?? []) {
+    if (p.display_name) displayNames[p.id] = p.display_name;
+    else if (p.username) displayNames[p.id] = `@${p.username}`;
+  }
+  // Fill any remaining with emails
   try {
     const { data: usersData } = await supabase.auth.admin.listUsers();
     for (const u of usersData?.users ?? []) {
-      userEmails[u.id] = u.email ?? u.id.slice(0, 8);
+      if (!displayNames[u.id]) displayNames[u.id] = u.email ?? u.id.slice(0, 8);
     }
   } catch {
-    // fallback: use truncated user IDs
     for (const uid of userIds) {
-      userEmails[uid] = uid.slice(0, 8);
+      if (!displayNames[uid]) displayNames[uid] = uid.slice(0, 8);
     }
   }
 
@@ -80,7 +86,7 @@ export async function GET(
   const leaderboard = (members ?? [])
     .map((m) => ({
       user_id: m.user_id,
-      display_name: userEmails[m.user_id] ?? m.user_id.slice(0, 8),
+      display_name: displayNames[m.user_id] ?? m.user_id.slice(0, 8),
       balance: balanceMap[m.user_id] ?? 0,
       total_trades: tradeCountMap[m.user_id] ?? 0,
       markets_won: marketsWonMap[m.user_id] ?? 0,

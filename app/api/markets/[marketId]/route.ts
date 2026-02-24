@@ -39,18 +39,28 @@ export async function GET(
     .order("created_at", { ascending: false })
     .limit(50);
 
-  // Get user emails for trades
+  // Get display names for traders (profiles → email fallback)
   const traderIds = [...new Set((trades ?? []).map((t) => t.user_id))];
   const traderEmails: Record<string, string> = {};
   if (traderIds.length > 0) {
+    const { data: profileRows } = await supabase
+      .from("profiles")
+      .select("id, display_name, username")
+      .in("id", traderIds);
+    for (const p of profileRows ?? []) {
+      if (p.display_name) traderEmails[p.id] = p.display_name;
+      else if (p.username) traderEmails[p.id] = `@${p.username}`;
+    }
+    // Fill remaining with emails
     try {
-      const { data: usersData } =
-        await supabase.auth.admin.listUsers();
+      const { data: usersData } = await supabase.auth.admin.listUsers();
       for (const u of usersData?.users ?? []) {
-        traderEmails[u.id] = u.email ?? u.id.slice(0, 8);
+        if (!traderEmails[u.id]) traderEmails[u.id] = u.email ?? u.id.slice(0, 8);
       }
     } catch {
-      for (const uid of traderIds) traderEmails[uid] = uid.slice(0, 8);
+      for (const uid of traderIds) {
+        if (!traderEmails[uid]) traderEmails[uid] = uid.slice(0, 8);
+      }
     }
   }
 
