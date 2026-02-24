@@ -65,6 +65,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   const [tab, setTab] = useState<Tab>("markets");
   const [loading, setLoading] = useState(true);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [copyLabel, setCopyLabel] = useState("Copy invite");
   const router = useRouter();
   const supabase = createClient();
@@ -116,9 +117,9 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     });
     if (res.ok) {
       const d = await res.json();
-      const url = d.invite_url ?? null;
-      setInviteUrl(url);
-      return url;
+      setInviteUrl(d.invite_url ?? null);
+      setInviteCode(d.code ?? null);
+      return d.invite_url ?? null;
     }
     return null;
   }
@@ -129,6 +130,16 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     if (url) {
       await navigator.clipboard.writeText(url);
       setCopyLabel("Copied!");
+      setTimeout(() => setCopyLabel("Copy invite"), 2000);
+    }
+  }
+
+  async function copyCode() {
+    let code = inviteCode;
+    if (!code) { await createInvite(); code = inviteCode; }
+    if (code) {
+      await navigator.clipboard.writeText(code);
+      setCopyLabel("Code copied!");
       setTimeout(() => setCopyLabel("Copy invite"), 2000);
     }
   }
@@ -147,7 +158,24 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
         {isNewGroup && group?.my_role === "admin" && (
           <div className="mb-5 p-4 rounded-xl border border-[#00d4a3]/30 bg-[#00d4a3]/5">
             <p className="text-sm font-semibold text-[#00d4a3] mb-1">Share your group</p>
-            <p className="text-xs text-zinc-500 mb-3">Send the invite link so others can join and trade.</p>
+            <p className="text-xs text-zinc-500 mb-3">Share the code or link so others can join and trade.</p>
+            {/* Short join code */}
+            <div className="flex items-center justify-between bg-[#111] border border-[#222] rounded-lg px-4 py-3 mb-2">
+              <div>
+                <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-0.5">Join code</p>
+                <p className="text-2xl font-bold text-white font-mono tracking-widest">
+                  {inviteCode ?? "······"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={copyCode}
+                className="h-8 px-3 text-xs font-semibold bg-[#00d4a3] text-black rounded-lg hover:bg-[#00bf95] transition-colors"
+              >
+                Copy code
+              </button>
+            </div>
+            {/* Full invite link */}
             <div className="flex gap-2">
               <input
                 type="text"
@@ -158,7 +186,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
               <button
                 type="button"
                 onClick={copyInvite}
-                className="h-9 px-4 text-xs font-semibold bg-[#00d4a3] text-black rounded-lg hover:bg-[#00bf95] transition-colors shrink-0"
+                className="h-9 px-4 text-xs font-semibold border border-[#2a2a2a] text-zinc-300 rounded-lg hover:bg-[#1a1a1a] transition-colors shrink-0"
               >
                 {copyLabel}
               </button>
@@ -202,10 +230,10 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
           ))}
           {group?.my_role === "admin" && tab === "markets" && (
             <button
-              onClick={copyInvite}
-              className="ml-auto pb-2.5 text-xs text-zinc-600 hover:text-[#00d4a3] transition-colors"
+              onClick={copyCode}
+              className="ml-auto pb-2.5 text-xs font-mono text-zinc-600 hover:text-[#00d4a3] transition-colors"
             >
-              {copyLabel}
+              {inviteCode ? `# ${inviteCode}` : "Share code"}
             </button>
           )}
         </div>

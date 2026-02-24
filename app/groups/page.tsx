@@ -25,6 +25,9 @@ export default function GroupsPage() {
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [joinErr, setJoinErr] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
@@ -50,6 +53,20 @@ export default function GroupsPage() {
       fetchGroups();
     }
   }, [pathname, fetchGroups]);
+
+  async function joinByCode(e: React.FormEvent) {
+    e.preventDefault();
+    setJoinErr(null);
+    setJoining(true);
+    const res = await fetch(`/api/join/${joinCode.trim().toUpperCase()}`, { method: "POST" });
+    const data = await res.json();
+    setJoining(false);
+    if (!res.ok) {
+      setJoinErr(data.error ?? "Invalid code");
+    } else {
+      router.push(`/groups/${data.group_id}`);
+    }
+  }
 
   async function createGroup(e: React.FormEvent) {
     e.preventDefault();
@@ -130,6 +147,26 @@ export default function GroupsPage() {
             </div>
           </form>
         )}
+
+        {/* Join with code */}
+        <form onSubmit={joinByCode} className="flex gap-2 mb-5">
+          <input
+            type="text"
+            placeholder="Enter join code"
+            value={joinCode}
+            onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); setJoinErr(null); }}
+            maxLength={6}
+            className="flex-1 h-10 px-3 bg-[#111] border border-[#222] rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#00d4a3] transition-colors font-mono tracking-widest uppercase"
+          />
+          <button
+            type="submit"
+            disabled={joining || joinCode.trim().length < 4}
+            className="h-10 px-4 text-xs font-semibold bg-[#111] border border-[#2a2a2a] text-zinc-300 rounded-lg hover:bg-[#1a1a1a] hover:text-white disabled:opacity-40 transition-colors shrink-0"
+          >
+            {joining ? "…" : "Join"}
+          </button>
+        </form>
+        {joinErr && <p className="text-xs text-red-400 -mt-3 mb-4">{joinErr}</p>}
 
         <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono mb-3">My groups</p>
 
