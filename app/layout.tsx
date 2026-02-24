@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Polymarket for Friends",
+  title: "Friend Markets",
   description: "Private prediction markets for friend groups",
   openGraph: {
-    title: "Polymarket for Friends",
+    title: "Friend Markets",
     description: "Private prediction markets for friend groups",
     type: "website",
   },
@@ -18,7 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-background text-foreground">
+      <body className="min-h-screen bg-[#0a0a0a] text-[#f0f0f0]">
         {children}
       </body>
     </html>

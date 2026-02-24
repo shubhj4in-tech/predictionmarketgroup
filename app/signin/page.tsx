@@ -2,102 +2,122 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/Button";
 import { Suspense } from "react";
 
+type Action = "signin" | "signup";
+
+const input =
+  "w-full h-11 px-3 bg-[#111] border border-[#222] rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#00d4a3] transition-colors";
+
 function SignInForm() {
+  const [action, setAction] = useState<Action>("signin");
   const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  // If already signed in, redirect
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) router.replace("/groups");
     });
   }, []);
 
-  const authError = searchParams.get("error");
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    setLoading(false);
-    if (error) {
-      setErr(error.message);
+
+    if (action === "signin") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setErr(error.message);
+      else router.replace("/groups");
     } else {
-      setSent(true);
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setErr(error.message);
+      } else {
+        // Auto sign-in after signup (works when email confirmation is disabled)
+        const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInErr) setErr("Account created — please sign in.");
+        else router.replace("/groups");
+      }
     }
+    setLoading(false);
   }
 
+  const authError = searchParams.get("error");
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-3">📊</div>
-          <h1 className="text-2xl font-bold text-gray-900">Polymarket for Friends</h1>
-          <p className="text-gray-500 mt-1 text-sm">Private prediction markets for your group</p>
+        {/* Wordmark */}
+        <div className="mb-10">
+          <p className="text-xs text-[#00d4a3] font-mono tracking-widest mb-2">FRIEND MARKETS</p>
+          <h1 className="text-2xl font-bold text-white leading-tight">
+            Predict with<br />your people.
+          </h1>
+          <p className="text-sm text-zinc-600 mt-2">Private prediction markets for any group.</p>
         </div>
 
-        {sent ? (
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-center">
-            <div className="text-4xl mb-3">📧</div>
-            <h2 className="font-semibold text-gray-900 mb-1">Check your email</h2>
-            <p className="text-sm text-gray-500">
-              We sent a magic link to <strong>{email}</strong>.
-              <br />
-              Click it to sign in.
-            </p>
+        {/* Sign in / Sign up tabs */}
+        <div className="flex gap-5 mb-6 border-b border-[#1e1e1e]">
+          {(["signin", "signup"] as Action[]).map((a) => (
             <button
-              onClick={() => setSent(false)}
-              className="mt-4 text-xs text-indigo-600 hover:underline"
+              key={a}
+              onClick={() => { setAction(a); setErr(null); }}
+              className={`pb-2.5 text-sm font-medium transition-colors ${
+                action === a
+                  ? "text-white border-b-2 border-[#00d4a3] -mb-px"
+                  : "text-zinc-600 hover:text-zinc-400"
+              }`}
             >
-              Try a different email
+              {a === "signin" ? "Sign in" : "Create account"}
             </button>
+          ))}
+        </div>
+
+        {(authError || err) && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">
+            {err ?? "Sign-in failed. Please try again."}
           </div>
-        ) : (
-          <form
-            onSubmit={handleSubmit}
-            className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+        )}
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <input
+            type="email"
+            required
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={input}
+            autoComplete="email"
+          />
+          <input
+            type="password"
+            required
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={6}
+            className={input}
+            autoComplete={action === "signin" ? "current-password" : "new-password"}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="mt-1 h-11 w-full bg-[#00d4a3] text-black text-sm font-semibold rounded-lg hover:bg-[#00bf95] disabled:opacity-50 transition-colors"
           >
-            {authError && (
-              <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-xl text-sm">
-                Sign-in failed. Please try again.
-              </div>
-            )}
-            {err && (
-              <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-xl text-sm">{err}</div>
-            )}
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Email address
-            </label>
-            <input
-              type="email"
-              required
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent mb-4"
-            />
-            <Button type="submit" fullWidth loading={loading}>
-              Send magic link
-            </Button>
-            <p className="text-center text-xs text-gray-400 mt-4">
-              No password needed — we&apos;ll email you a one-click sign-in link.
-            </p>
-          </form>
+            {loading ? "…" : action === "signin" ? "Sign in" : "Create account"}
+          </button>
+        </form>
+
+        {action === "signup" && (
+          <p className="text-xs text-zinc-700 text-center mt-4">
+            Min 6 characters for password.
+          </p>
         )}
       </div>
     </div>

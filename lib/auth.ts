@@ -7,13 +7,13 @@ type RouteContext = {
   params?: Record<string, string>;
 };
 
-/** Returns the authenticated user or null. */
+/** Returns the authenticated user or null (reads from cookie, no network call). */
 export async function getUser(): Promise<User | null> {
   const supabase = await createClient();
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.user ?? null;
 }
 
 /** Returns the user or a 401 JSON response. */
@@ -82,6 +82,7 @@ export function rpcError(message: string): NextResponse {
     invite_expired: 409,
     invite_exhausted: 409,
     already_member: 409,
+    admin_cannot_trade: 403,
   };
   const status = statusMap[code] ?? 500;
   return NextResponse.json({ error: message, code }, { status });

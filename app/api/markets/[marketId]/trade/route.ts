@@ -46,6 +46,14 @@ export async function POST(
   const member = await checkMembership(market.group_id, user.id);
   if (!member) return forbidden();
 
+  // Admins cannot participate in their own group's markets
+  if (member.role === "admin") {
+    return NextResponse.json(
+      { error: "Admins cannot participate in their group's markets." },
+      { status: 403 }
+    );
+  }
+
   // Server-side open/close guard
   if (market.status !== "open") return rpcError("market_not_open");
   if (new Date(market.close_time) <= new Date()) return rpcError("market_closed");

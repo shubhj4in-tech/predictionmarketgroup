@@ -2,7 +2,6 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/Button";
 
 interface InvitePreview {
   group_id: string;
@@ -24,36 +23,28 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
   const supabase = createClient();
 
   useEffect(() => {
-    // Check auth
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUserId(session?.user?.id ?? null);
     });
 
-    // Fetch invite preview (no auth required)
     fetch(`/api/invites/${token}`)
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok) {
-          setError(data.error ?? "Invalid invite");
-        } else {
-          setPreview(data);
-        }
+        if (!res.ok) setError(data.error ?? "Invalid invite");
+        else setPreview(data);
         setLoading(false);
       });
   }, [token]);
 
   async function acceptInvite() {
     if (!userId) {
-      // Redirect to sign in, then back
       router.push(`/signin?next=/invite/${token}`);
       return;
     }
-
     setJoining(true);
     const res = await fetch(`/api/invites/${token}`, { method: "POST" });
     const data = await res.json();
     setJoining(false);
-
     if (res.status === 409 && data.code === "already_member") {
       setIsAlreadyMember(true);
       if (preview) router.push(`/groups/${preview.group_id}`);
@@ -66,63 +57,69 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white flex items-center justify-center">
-        <div className="text-gray-400 text-sm">Loading invite…</div>
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <p className="text-sm text-zinc-700">Loading…</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-sm bg-white rounded-2xl border border-gray-100 p-8 text-center shadow-sm">
-          <div className="text-4xl mb-3">❌</div>
-          <h2 className="font-semibold text-gray-800 mb-1">Invalid invite</h2>
-          <p className="text-sm text-gray-500 mb-4">{error}</p>
-          <Button variant="secondary" onClick={() => router.push("/groups")} fullWidth>
+      <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4">
+        <div className="w-full max-w-sm border border-[#222] rounded-xl p-6 bg-[#111] text-center">
+          <p className="text-sm font-semibold text-white mb-1">Invalid invite</p>
+          <p className="text-xs text-zinc-500 mb-5">{error}</p>
+          <button
+            onClick={() => router.push("/groups")}
+            className="h-10 w-full text-xs font-medium text-zinc-300 border border-[#2a2a2a] rounded-lg hover:bg-[#1a1a1a] transition-colors"
+          >
             Go to my groups
-          </Button>
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
         <div className="text-center mb-6">
-          <div className="text-4xl mb-2">📊</div>
-          <p className="text-sm text-gray-500">You&apos;re invited to join</p>
+          <p className="text-xs text-[#00d4a3] font-mono tracking-widest">FRIEND MARKETS</p>
+          <p className="text-sm text-zinc-600 mt-1">You&apos;re invited to join</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-gray-900 mb-1">{preview!.group_name}</h1>
+        <div className="border border-[#222] rounded-xl p-6 bg-[#111]">
+          <h1 className="text-xl font-bold text-white mb-1">{preview!.group_name}</h1>
           {preview!.group_description && (
-            <p className="text-sm text-gray-500 mb-3">{preview!.group_description}</p>
+            <p className="text-sm text-zinc-500 mb-3">{preview!.group_description}</p>
           )}
-          <p className="text-sm text-gray-500 mb-6">
-            {preview!.member_count} {preview!.member_count === 1 ? "member" : "members"} ·
-            {" "}Start with <strong>1,000 credits</strong>
-          </p>
+          <div className="flex items-center gap-2 mb-6">
+            <span className="text-xs text-zinc-600">
+              {preview!.member_count} {preview!.member_count === 1 ? "member" : "members"}
+            </span>
+            <span className="text-zinc-800">·</span>
+            <span className="text-xs text-zinc-600">Start with <span className="text-white font-medium">1,000 credits</span></span>
+          </div>
 
           {isAlreadyMember ? (
-            <Button variant="secondary" fullWidth onClick={() => router.push(`/groups/${preview!.group_id}`)}>
-              Go to group →
-            </Button>
+            <button
+              onClick={() => router.push(`/groups/${preview!.group_id}`)}
+              className="h-11 w-full text-sm font-semibold text-zinc-300 border border-[#2a2a2a] rounded-lg hover:bg-[#1a1a1a] transition-colors"
+            >
+              Go to group
+            </button>
           ) : (
             <>
-              <Button
-                fullWidth
-                size="lg"
-                loading={joining}
+              <button
                 onClick={acceptInvite}
+                disabled={joining}
+                className="h-11 w-full text-sm font-semibold bg-[#00d4a3] text-black rounded-lg hover:bg-[#00bf95] disabled:opacity-50 transition-colors"
               >
-                {userId ? "Join group" : "Sign in to join"}
-              </Button>
+                {joining ? "…" : userId ? "Join group" : "Sign in to join"}
+              </button>
               {!userId && (
-                <p className="text-center text-xs text-gray-400 mt-3">
-                  You&apos;ll be brought back here after signing in.
+                <p className="text-center text-xs text-zinc-700 mt-3">
+                  You&apos;ll be brought back after signing in.
                 </p>
               )}
             </>
@@ -130,8 +127,8 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
         </div>
 
         {preview!.expires_at && (
-          <p className="text-center text-xs text-gray-400 mt-4">
-            Invite expires {new Date(preview!.expires_at).toLocaleDateString()}
+          <p className="text-center text-xs text-zinc-700 mt-4">
+            Expires {new Date(preview!.expires_at).toLocaleDateString()}
           </p>
         )}
       </div>

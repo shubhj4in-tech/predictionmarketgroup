@@ -2,10 +2,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { use } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/layout/Header";
-import { Button } from "@/components/ui/Button";
 
 interface Market {
   id: string;
@@ -38,29 +37,35 @@ interface GroupDetail {
 
 type Tab = "markets" | "leaderboard";
 
-function StatusBadge({ status, outcome }: { status: string; outcome: string | null }) {
+function StatusChip({ status, outcome }: { status: string; outcome: string | null }) {
   if (status === "resolved") {
     return (
-      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${outcome === "YES" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+        outcome === "YES"
+          ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+          : "text-red-400 border-red-500/30 bg-red-500/10"
+      }`}>
         {outcome}
       </span>
     );
   }
   if (status === "closed") {
-    return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Closed</span>;
+    return <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border text-zinc-500 border-zinc-700 bg-zinc-800/50">CLOSED</span>;
   }
-  return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Live</span>;
+  return <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border text-[#00d4a3] border-[#00d4a3]/30 bg-[#00d4a3]/10">LIVE</span>;
 }
 
 export default function GroupPage({ params }: { params: Promise<{ groupId: string }> }) {
   const { groupId } = use(params);
+  const searchParams = useSearchParams();
+  const isNewGroup = searchParams.get("new") === "1";
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [markets, setMarkets] = useState<Market[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [tab, setTab] = useState<Tab>("markets");
   const [loading, setLoading] = useState(true);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
-  const [copyLabel, setCopyLabel] = useState("Copy invite link");
+  const [copyLabel, setCopyLabel] = useState("Copy invite");
   const router = useRouter();
   const supabase = createClient();
 
@@ -71,7 +76,6 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     ]);
     if (groupRes.status === 401) { router.replace("/signin"); return; }
     if (groupRes.status === 403) { router.replace("/groups"); return; }
-
     if (groupRes.ok) setGroup(await groupRes.json());
     if (marketsRes.ok) {
       const d = await marketsRes.json();
@@ -95,7 +99,6 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     fetchData();
   }, [fetchData]);
 
-  // Poll markets every 10s
   useEffect(() => {
     const iv = setInterval(fetchData, 10000);
     return () => clearInterval(iv);
@@ -105,7 +108,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     if (tab === "leaderboard") fetchLeaderboard();
   }, [tab, fetchLeaderboard]);
 
-  async function createInvite() {
+  async function createInvite(): Promise<string | null> {
     const res = await fetch("/api/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -113,129 +116,144 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     });
     if (res.ok) {
       const d = await res.json();
-      setInviteUrl(d.invite_url);
+      const url = d.invite_url ?? null;
+      setInviteUrl(url);
+      return url;
     }
+    return null;
   }
 
   async function copyInvite() {
-    if (!inviteUrl) {
-      await createInvite();
-    }
-    if (inviteUrl) {
-      await navigator.clipboard.writeText(inviteUrl);
+    let url = inviteUrl;
+    if (!url) url = await createInvite();
+    if (url) {
+      await navigator.clipboard.writeText(url);
       setCopyLabel("Copied!");
-      setTimeout(() => setCopyLabel("Copy invite link"), 2000);
+      setTimeout(() => setCopyLabel("Copy invite"), 2000);
     }
   }
 
-  const medals = ["🥇", "🥈", "🥉"];
+  // When landing after creating a group, fetch invite URL so we can show share card
+  useEffect(() => {
+    if (isNewGroup && group && group.my_role === "admin") createInvite();
+  }, [isNewGroup, group?.id]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0a0a0a]">
       <Header title={group?.name ?? "Group"} backHref="/groups" />
 
-      <main className="max-w-md mx-auto px-4 py-4">
+      <main className="max-w-md mx-auto px-4 py-5">
+        {/* Share group card — shown after creating a new group */}
+        {isNewGroup && group?.my_role === "admin" && (
+          <div className="mb-5 p-4 rounded-xl border border-[#00d4a3]/30 bg-[#00d4a3]/5">
+            <p className="text-sm font-semibold text-[#00d4a3] mb-1">Share your group</p>
+            <p className="text-xs text-zinc-500 mb-3">Send the invite link so others can join and trade.</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={inviteUrl ?? "Generating…"}
+                className="flex-1 h-9 px-3 bg-[#111] border border-[#222] rounded-lg text-xs text-zinc-400 truncate"
+              />
+              <button
+                type="button"
+                onClick={copyInvite}
+                className="h-9 px-4 text-xs font-semibold bg-[#00d4a3] text-black rounded-lg hover:bg-[#00bf95] transition-colors shrink-0"
+              >
+                {copyLabel}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Group header */}
         {group && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 shadow-sm">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h1 className="font-bold text-gray-900">{group.name}</h1>
-                {group.description && (
-                  <p className="text-xs text-gray-400 mt-0.5">{group.description}</p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  {group.member_count} {group.member_count === 1 ? "member" : "members"}
-                </p>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-xs text-gray-400">Your balance</p>
-                <p className="font-bold text-gray-900 text-lg">
-                  {group.my_balance.toLocaleString()}
-                  <span className="text-xs font-normal text-gray-400 ml-1">cr</span>
-                </p>
-              </div>
+          <div className="flex items-start justify-between mb-5">
+            <div>
+              <h1 className="text-base font-semibold text-white">{group.name}</h1>
+              <p className="text-xs text-zinc-600 mt-0.5">
+                {group.member_count} {group.member_count === 1 ? "member" : "members"}
+                {group.description ? ` · ${group.description}` : ""}
+              </p>
             </div>
-
-            {group.my_role === "admin" && (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={copyInvite}
-                className="mt-3 w-full"
-              >
-                🔗 {copyLabel}
-              </Button>
-            )}
+            <div className="text-right flex-shrink-0 ml-4">
+              <p className="text-lg font-bold text-white tabular-nums">
+                {group.my_balance.toLocaleString()}
+              </p>
+              <p className="text-[10px] text-zinc-600 uppercase tracking-wider">credits</p>
+            </div>
           </div>
         )}
 
         {/* Tabs */}
-        <div className="flex bg-gray-100 rounded-xl p-1 mb-4">
+        <div className="flex gap-5 border-b border-[#1e1e1e] mb-5">
           {(["markets", "leaderboard"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 h-9 rounded-lg text-sm font-medium transition-colors ${
+              className={`pb-2.5 text-sm font-medium transition-colors ${
                 tab === t
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
+                  ? "text-white border-b-2 border-[#00d4a3] -mb-px"
+                  : "text-zinc-600 hover:text-zinc-400"
               }`}
             >
               {t === "markets" ? "Markets" : "Leaderboard"}
             </button>
           ))}
+          {group?.my_role === "admin" && tab === "markets" && (
+            <button
+              onClick={copyInvite}
+              className="ml-auto pb-2.5 text-xs text-zinc-600 hover:text-[#00d4a3] transition-colors"
+            >
+              {copyLabel}
+            </button>
+          )}
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-gray-400 text-sm">Loading…</div>
+          <div className="py-16 text-center text-sm text-zinc-700">Loading…</div>
         ) : tab === "markets" ? (
           <>
             <Link
               href={`/groups/${groupId}/markets/new`}
-              className="flex items-center justify-center gap-2 w-full h-11 bg-indigo-600 text-white rounded-xl font-semibold text-sm mb-4 hover:bg-indigo-700 transition-colors"
+              className="flex items-center justify-center h-10 w-full mb-4 text-xs font-semibold text-black bg-[#00d4a3] rounded-lg hover:bg-[#00bf95] transition-colors"
             >
               + Create market
             </Link>
             {markets.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center shadow-sm">
-                <div className="text-4xl mb-3">🎯</div>
-                <p className="font-semibold text-gray-700 mb-1">No markets yet</p>
-                <p className="text-sm text-gray-400">Be the first to create a prediction market!</p>
+              <div className="py-16 text-center">
+                <p className="text-sm text-zinc-500">No markets yet</p>
+                <p className="text-xs text-zinc-700 mt-1">Create the first prediction market.</p>
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
-                {markets.map((m) => (
+              <div className="border border-[#1e1e1e] rounded-xl overflow-hidden">
+                {markets.map((m, i) => (
                   <Link
                     key={m.id}
                     href={`/markets/${m.id}`}
-                    className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-indigo-200 transition-all"
+                    className={`block px-4 py-3.5 hover:bg-[#111] transition-colors ${
+                      i !== 0 ? "border-t border-[#1e1e1e]" : ""
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-medium text-gray-900 text-sm leading-snug flex-1">
-                        {m.question}
-                      </p>
-                      <StatusBadge status={m.status} outcome={m.outcome} />
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <p className="text-sm text-white leading-snug flex-1">{m.question}</p>
+                      <StatusChip status={m.status} outcome={m.outcome} />
                     </div>
-                    <div className="flex items-center gap-4 mt-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-semibold text-emerald-600">
-                          YES {Math.round(m.price_yes * 100)}%
-                        </span>
-                        <span className="text-xs text-gray-300">·</span>
-                        <span className="text-xs font-semibold text-rose-500">
-                          NO {Math.round(m.price_no * 100)}%
-                        </span>
-                      </div>
-                      <span className="text-xs text-gray-400">
-                        {m.trade_count} trade{m.trade_count !== 1 ? "s" : ""}
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-mono text-emerald-400">
+                        {Math.round(m.price_yes * 100)}%
                       </span>
-                      <span className="text-xs text-gray-400 ml-auto">
-                        {m.status === "open"
-                          ? `Closes ${new Date(m.close_time).toLocaleDateString()}`
-                          : m.status === "closed"
-                          ? "Awaiting resolution"
-                          : "Resolved"}
+                      <div className="flex-1 h-1 bg-[#1e1e1e] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 transition-all"
+                          style={{ width: `${Math.round(m.price_yes * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-mono text-red-400">
+                        {Math.round(m.price_no * 100)}%
+                      </span>
+                      <span className="text-xs text-zinc-700">
+                        {m.trade_count}t
                       </span>
                     </div>
                   </Link>
@@ -244,35 +262,36 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
             )}
           </>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div>
             {leaderboard.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-sm">No data yet</div>
+              <div className="py-16 text-center text-sm text-zinc-700">No data yet</div>
             ) : (
-              leaderboard.map((entry, i) => (
-                <div
-                  key={entry.user_id}
-                  className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-center gap-3"
-                >
-                  <span className="text-xl w-8 text-center flex-shrink-0">
-                    {medals[i] ?? `${i + 1}`}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-gray-900 truncate">
-                      {entry.display_name}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {entry.total_trades} trade{entry.total_trades !== 1 ? "s" : ""} ·{" "}
-                      {entry.markets_won} won
-                    </p>
+              <div className="border border-[#1e1e1e] rounded-xl overflow-hidden">
+                {leaderboard.map((entry, i) => (
+                  <div
+                    key={entry.user_id}
+                    className={`flex items-center gap-3 px-4 py-3.5 ${
+                      i !== 0 ? "border-t border-[#1e1e1e]" : ""
+                    }`}
+                  >
+                    <span className="text-xs font-mono text-zinc-600 w-5 text-right flex-shrink-0">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{entry.display_name}</p>
+                      <p className="text-xs text-zinc-600 mt-0.5">
+                        {entry.total_trades} trades · {entry.markets_won} won
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-bold text-white tabular-nums">
+                        {Number(entry.balance).toLocaleString()}
+                      </p>
+                      <p className="text-[10px] text-zinc-700">cr</p>
+                    </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="font-bold text-gray-900">
-                      {Number(entry.balance).toLocaleString()}
-                    </p>
-                    <p className="text-xs text-gray-400">credits</p>
-                  </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         )}

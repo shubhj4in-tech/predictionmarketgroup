@@ -81,6 +81,7 @@ export async function GET(
   return NextResponse.json({
     id: market.id,
     group_id: market.group_id,
+    my_role: member.role,
     question: market.question,
     description: market.description,
     status: market.status,

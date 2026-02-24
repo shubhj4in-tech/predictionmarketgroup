@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 interface HeaderProps {
-  title?: string;
+  title: string;
   backHref?: string;
 }
 
@@ -22,47 +22,29 @@ export function Header({ title, backHref }: HeaderProps) {
 
   async function signOut() {
     await supabase.auth.signOut();
-    router.push("/signin");
-    router.refresh();
+    router.replace("/signin");
   }
 
   return (
-    <header className="sticky top-0 z-20 bg-white border-b border-gray-100">
-      <div className="max-w-md mx-auto flex items-center justify-between h-14 px-4">
-        <div className="flex items-center gap-2 min-w-0">
-          {backHref ? (
-            <Link
-              href={backHref}
-              className="flex items-center justify-center w-9 h-9 -ml-1 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors flex-shrink-0"
-              aria-label="Back"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </Link>
-          ) : (
-            <Link href="/groups" className="text-indigo-600 font-bold text-lg flex-shrink-0">
-              📊
-            </Link>
-          )}
-          {title && (
-            <span className="font-semibold text-gray-900 truncate">{title}</span>
-          )}
-        </div>
-
+    <header className="sticky top-0 z-50 bg-[#0a0a0a] border-b border-[#1e1e1e]">
+      <div className="max-w-md mx-auto px-4 h-12 flex items-center gap-3">
+        {backHref ? (
+          <Link
+            href={backHref}
+            className="flex items-center justify-center w-8 h-8 -ml-1.5 text-zinc-500 hover:text-white transition-colors"
+          >
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        ) : (
+          <span className="text-[#00d4a3] font-bold text-sm tracking-tight">FM</span>
+        )}
+        <span className="flex-1 text-sm font-semibold text-white truncate">{title}</span>
         {email && (
           <button
             onClick={signOut}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0 ml-2"
+            className="text-xs text-zinc-600 hover:text-zinc-300 transition-colors"
           >
             Sign out
           </button>
