@@ -198,7 +198,7 @@ export default function MarketPage({ params }: { params: Promise<{ marketId: str
     "w-full px-3 py-2.5 bg-[#111] border border-[#222] rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#00d4a3] transition-colors resize-none";
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] pb-10">
+    <div className="min-h-screen bg-[#0a0a0a] pb-24">
       <Header
         title={market.status === "open" ? "Market" : market.status === "closed" ? "Closed" : "Resolved"}
         backHref={`/groups/${market.group_id}`}

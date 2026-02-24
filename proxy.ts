@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // Routes that require authentication
 // /invite is intentionally NOT protected — the page handles auth inline
 // so unauthenticated users can preview the invite before signing in.
-const PROTECTED_ROUTES = ["/groups", "/markets"];
+const PROTECTED_ROUTES = ["/home", "/groups", "/markets", "/bets"];
 
 export async function proxy(request: NextRequest) {
   // If Supabase isn't configured yet, let all requests through (dev scaffold mode)
@@ -55,7 +55,7 @@ export async function proxy(request: NextRequest) {
   // Redirect authenticated users away from signin
   if (pathname === "/signin" && user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/groups";
+    url.pathname = "/home";
     return NextResponse.redirect(url);
   }
 

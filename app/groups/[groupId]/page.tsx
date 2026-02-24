@@ -139,7 +139,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   }, [isNewGroup, group?.id]);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-[#0a0a0a] pb-20">
       <Header title={group?.name ?? "Group"} backHref="/groups" />
 
       <main className="max-w-md mx-auto px-4 py-5">
