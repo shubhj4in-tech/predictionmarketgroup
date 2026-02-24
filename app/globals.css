@@ -13,7 +13,12 @@
   --accent: #00d4a3;
 }
 
-html, body {
+html {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
   max-width: 100vw;
   overflow-x: hidden;
   background: var(--bg);
