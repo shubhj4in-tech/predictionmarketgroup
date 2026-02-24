@@ -39,7 +39,7 @@ export async function GET(
     .order("created_at", { ascending: false })
     .limit(50);
 
-  // Get display names for traders (profiles → email fallback)
+  // Get display names for traders — profiles only, never emails
   const traderIds = [...new Set((trades ?? []).map((t) => t.user_id))];
   const traderEmails: Record<string, string> = {};
   if (traderIds.length > 0) {
@@ -51,16 +51,9 @@ export async function GET(
       if (p.display_name) traderEmails[p.id] = p.display_name;
       else if (p.username) traderEmails[p.id] = `@${p.username}`;
     }
-    // Fill remaining with emails
-    try {
-      const { data: usersData } = await supabase.auth.admin.listUsers();
-      for (const u of usersData?.users ?? []) {
-        if (!traderEmails[u.id]) traderEmails[u.id] = u.email ?? u.id.slice(0, 8);
-      }
-    } catch {
-      for (const uid of traderIds) {
-        if (!traderEmails[uid]) traderEmails[uid] = uid.slice(0, 8);
-      }
+    // Fall back to anonymised ID prefix — never email
+    for (const uid of traderIds) {
+      if (!traderEmails[uid]) traderEmails[uid] = `user_${uid.slice(0, 6)}`;
     }
   }
 

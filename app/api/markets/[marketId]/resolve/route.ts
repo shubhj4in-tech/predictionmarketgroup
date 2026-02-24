@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser, notFound, rpcError } from "@/lib/auth";
+import { requireUser, checkMembership, notFound, forbidden, rpcError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { parseBody, ResolveSchema } from "@/lib/validators";
 
@@ -26,6 +26,10 @@ export async function POST(
 
   if (!market) return notFound("Market");
 
+  // Must still be a member of the group (handles case where creator was removed)
+  const member = await checkMembership(market.group_id, user.id);
+  if (!member) return forbidden();
+
   // Only creator can resolve
   if (market.creator_id !== user.id) {
     return NextResponse.json(
@@ -49,7 +53,8 @@ export async function POST(
     .eq("id", marketId);
 
   if (dbErr) {
-    return NextResponse.json({ error: dbErr.message }, { status: 500 });
+    console.error("resolve market error:", dbErr);
+    return NextResponse.json({ error: "Failed to resolve market" }, { status: 500 });
   }
 
   return NextResponse.json({ resolved: true, outcome });

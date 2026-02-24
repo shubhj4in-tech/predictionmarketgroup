@@ -31,6 +31,9 @@ export async function PATCH(request: Request) {
   const display_name = typeof body.display_name === "string" ? body.display_name.trim() : undefined;
   const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : undefined;
 
+  if (display_name !== undefined && display_name.length > 60) {
+    return NextResponse.json({ error: "Display name must be 60 characters or less" }, { status: 400 });
+  }
   if (username && !/^[a-z0-9_]{1,30}$/.test(username)) {
     return NextResponse.json(
       { error: "Username can only contain letters, numbers, and underscores (max 30 chars)" },

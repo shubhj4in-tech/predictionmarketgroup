@@ -44,7 +44,7 @@ export async function GET(
     .select("user_id, market_id")
     .in("user_id", userIds);
 
-  // Get display names from profiles, fall back to email, then truncated ID
+  // Get display names from profiles only — never expose emails
   const displayNames: Record<string, string> = {};
   const { data: profileRows } = await supabase
     .from("profiles")
@@ -54,16 +54,9 @@ export async function GET(
     if (p.display_name) displayNames[p.id] = p.display_name;
     else if (p.username) displayNames[p.id] = `@${p.username}`;
   }
-  // Fill any remaining with emails
-  try {
-    const { data: usersData } = await supabase.auth.admin.listUsers();
-    for (const u of usersData?.users ?? []) {
-      if (!displayNames[u.id]) displayNames[u.id] = u.email ?? u.id.slice(0, 8);
-    }
-  } catch {
-    for (const uid of userIds) {
-      if (!displayNames[uid]) displayNames[uid] = uid.slice(0, 8);
-    }
+  // Fall back to anonymised user ID prefix — never email
+  for (const uid of userIds) {
+    if (!displayNames[uid]) displayNames[uid] = `user_${uid.slice(0, 6)}`;
   }
 
   const balanceMap: Record<string, number> = {};

@@ -155,12 +155,12 @@ export default function GroupsPage() {
             placeholder="Enter join code"
             value={joinCode}
             onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); setJoinErr(null); }}
-            maxLength={6}
+            maxLength={8}
             className="flex-1 h-10 px-3 bg-[#111] border border-[#222] rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#00d4a3] transition-colors font-mono tracking-widest uppercase"
           />
           <button
             type="submit"
-            disabled={joining || joinCode.trim().length < 4}
+            disabled={joining || joinCode.trim().length < 6}
             className="h-10 px-4 text-xs font-semibold bg-[#111] border border-[#2a2a2a] text-zinc-300 rounded-lg hover:bg-[#1a1a1a] hover:text-white disabled:opacity-40 transition-colors shrink-0"
           >
             {joining ? "…" : "Join"}

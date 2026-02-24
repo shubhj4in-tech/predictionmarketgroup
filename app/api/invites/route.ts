@@ -7,7 +7,7 @@ import crypto from "crypto";
 // Excludes ambiguous chars: 0/O, 1/I/L
 const CODE_CHARSET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 function generateCode(): string {
-  const bytes = crypto.randomBytes(6);
+  const bytes = crypto.randomBytes(8);
   return Array.from(bytes)
     .map((b) => CODE_CHARSET[b % CODE_CHARSET.length])
     .join("");

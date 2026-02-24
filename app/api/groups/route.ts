@@ -25,7 +25,8 @@ export async function GET() {
     .eq("user_id", user.id);
 
   if (dbErr) {
-    return NextResponse.json({ error: dbErr.message }, { status: 500 });
+    console.error("groups fetch error:", dbErr);
+    return NextResponse.json({ error: "Failed to fetch groups" }, { status: 500 });
   }
 
   type GroupRow = { id: string; name: string; description: string | null; created_at: string };
@@ -90,10 +91,8 @@ export async function POST(request: Request) {
     .single();
 
   if (groupErr || !group) {
-    return NextResponse.json(
-      { error: groupErr?.message ?? "Failed to create group" },
-      { status: 500 }
-    );
+    console.error("group create error:", groupErr);
+    return NextResponse.json({ error: "Failed to create group" }, { status: 500 });
   }
 
   // Add creator as admin

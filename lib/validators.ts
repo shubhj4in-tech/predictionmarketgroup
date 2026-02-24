@@ -11,7 +11,9 @@ export const CreateMarketSchema = z.object({
   close_time: z
     .string()
     .datetime({ message: "close_time must be a valid ISO 8601 date" })
-    .refine((v) => new Date(v) > new Date(), { message: "close_time must be in the future" }),
+    .refine((v) => new Date(v) > new Date(Date.now() + 5 * 60 * 1000), {
+      message: "close_time must be at least 5 minutes in the future",
+    }),
   b_liquidity: z.number().min(1).max(10000).default(50).optional(),
 });
 
