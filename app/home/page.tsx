@@ -21,87 +21,77 @@ interface OpenMarket {
 
 function timeLeft(iso: string): string {
   const ms = new Date(iso).getTime() - Date.now();
-  if (ms <= 0) return "Closing";
+  if (ms <= 0) return "closing";
   const mins = Math.floor(ms / 60000);
-  if (mins < 60) return `${mins}m left`;
+  if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h left`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d left`;
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.floor(hrs / 24)}d`;
 }
 
-function isClosingSoon(iso: string): boolean {
-  return new Date(iso).getTime() - Date.now() < 3 * 3600 * 1000;
-}
-
-function MarketCard({ m }: { m: OpenMarket }) {
+function MarketRow({ m, last }: { m: OpenMarket; last: boolean }) {
   const yPct = Math.round(m.price_yes * 100);
-  const nPct = 100 - yPct;
-  const soon = isClosingSoon(m.close_time);
+  const soon = new Date(m.close_time).getTime() - Date.now() < 3 * 3600 * 1000;
 
   return (
-    <Link href={`/markets/${m.id}`} className="block active:opacity-80 transition-opacity">
-      <div className="bg-[#111] border border-[#1e1e1e] rounded-2xl p-4 active:bg-[#161616] transition-colors">
-
-        {/* Top row: group + time */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-[#00d4a3]">
-              <span className="animate-ping absolute h-1.5 w-1.5 rounded-full bg-[#00d4a3] opacity-75" />
-            </span>
-            <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">{m.group_name}</span>
-          </div>
-          <span className={`text-[11px] font-mono ${soon ? "text-amber-400" : "text-zinc-600"}`}>
-            {timeLeft(m.close_time)}
-          </span>
-        </div>
-
-        {/* Question */}
-        <p className="text-[15px] font-semibold text-white leading-snug mb-4">{m.question}</p>
-
-        {/* Probability bar */}
-        <div className="h-2 bg-[#1e1e1e] rounded-full overflow-hidden mb-3">
+    <Link
+      href={`/markets/${m.id}`}
+      className={`flex items-center gap-3 px-4 py-3.5 active:bg-[#161616] transition-colors ${!last ? "border-b border-[#181818]" : ""}`}
+    >
+      {/* Left: question + meta */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[13.5px] font-medium text-white leading-snug line-clamp-2 mb-2">
+          {m.question}
+        </p>
+        {/* Thin probability bar */}
+        <div className="h-[3px] bg-[#1e1e1e] rounded-full overflow-hidden mb-2">
           <div
-            className="h-full rounded-full transition-all duration-700"
+            className="h-full rounded-full"
             style={{
               width: `${yPct}%`,
-              background: `linear-gradient(90deg, #10b981 0%, #34d399 100%)`,
+              background: yPct >= 50 ? "#10b981" : "#ef4444",
             }}
           />
         </div>
-
-        {/* YES / NO percentages */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-emerald-400 tabular-nums leading-none">{yPct}%</span>
-            <span className="text-xs text-zinc-600 font-medium">YES</span>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xs text-zinc-600 font-medium">NO</span>
-            <span className="text-2xl font-black text-red-400 tabular-nums leading-none">{nPct}%</span>
-          </div>
-        </div>
-
-        {/* Footer: trades + position */}
-        <div className="flex items-center justify-between pt-2.5 border-t border-[#1e1e1e]">
-          <span className="text-[11px] text-zinc-700 tabular-nums">
-            {m.trade_count} {m.trade_count === 1 ? "trade" : "trades"}
+        {/* Meta row */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] text-zinc-500 font-medium">{m.group_name}</span>
+          <span className="text-zinc-700 text-[11px]">·</span>
+          <span className="text-[11px] text-zinc-700">{m.trade_count} trades</span>
+          <span className="text-zinc-700 text-[11px]">·</span>
+          <span className={`text-[11px] ${soon ? "text-amber-500" : "text-zinc-700"}`}>
+            {timeLeft(m.close_time)}
           </span>
-          {m.i_participated ? (
-            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-              m.my_yes_shares > 0
-                ? "text-emerald-400 bg-emerald-500/10"
-                : "text-red-400 bg-red-500/10"
-            }`}>
-              {m.my_yes_shares > 0 ? `You bet YES` : `You bet NO`}
-            </span>
-          ) : (
-            <span className="text-[11px] text-[#00d4a3] font-medium">Tap to trade →</span>
+          {m.i_participated && (
+            <>
+              <span className="text-zinc-700 text-[11px]">·</span>
+              <span className={`text-[11px] font-semibold ${m.my_yes_shares > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {m.my_yes_shares > 0 ? "↑ YES" : "↓ NO"}
+              </span>
+            </>
           )}
         </div>
       </div>
+
+      {/* Right: probability */}
+      <div className="flex-shrink-0 text-right w-14">
+        <p className={`text-[17px] font-bold tabular-nums leading-none ${yPct >= 50 ? "text-emerald-400" : "text-red-400"}`}>
+          {yPct}%
+        </p>
+        <p className="text-[10px] text-zinc-600 mt-0.5 uppercase tracking-wider">YES</p>
+      </div>
     </Link>
+  );
+}
+
+function SkeletonRow({ last }: { last: boolean }) {
+  return (
+    <div className={`px-4 py-3.5 ${!last ? "border-b border-[#181818]" : ""}`}>
+      <div className="h-3.5 bg-[#1a1a1a] rounded w-4/5 mb-2 animate-pulse" />
+      <div className="h-3.5 bg-[#1a1a1a] rounded w-3/5 mb-3 animate-pulse" />
+      <div className="h-[3px] bg-[#1a1a1a] rounded-full mb-2 animate-pulse" />
+      <div className="h-2.5 bg-[#1a1a1a] rounded w-2/5 animate-pulse" />
+    </div>
   );
 }
 
@@ -134,51 +124,34 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-24">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-[#0a0a0a]/95 backdrop-blur border-b border-[#1e1e1e]">
-        <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
-          <span className="text-base font-bold text-white tracking-tight">Friend Markets</span>
+      <header className="sticky top-0 z-50 bg-[#0a0a0a]/95 backdrop-blur border-b border-[#181818]">
+        <div className="max-w-md mx-auto px-4 h-12 flex items-center justify-between">
+          <span className="text-sm font-semibold text-white">Friend Markets</span>
           <div className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#00d4a3] animate-pulse" />
-            <span className="text-[11px] text-[#00d4a3] font-mono tracking-widest">LIVE</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-[#00d4a3]" />
+            <span className="text-[10px] text-[#00d4a3] font-mono tracking-widest">LIVE</span>
           </div>
         </div>
       </header>
 
       <main className="max-w-md mx-auto px-4 py-4">
         {loading ? (
-          <div className="space-y-3 mt-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-[#111] border border-[#1e1e1e] rounded-2xl p-4 animate-pulse">
-                <div className="h-3 bg-[#1e1e1e] rounded w-1/3 mb-3" />
-                <div className="h-4 bg-[#1e1e1e] rounded w-full mb-2" />
-                <div className="h-4 bg-[#1e1e1e] rounded w-3/4 mb-4" />
-                <div className="h-2 bg-[#1e1e1e] rounded-full mb-3" />
-                <div className="h-6 bg-[#1e1e1e] rounded w-1/4" />
-              </div>
-            ))}
+          <div className="border border-[#1e1e1e] rounded-xl overflow-hidden">
+            {[0, 1, 2].map((i) => <SkeletonRow key={i} last={i === 2} />)}
           </div>
         ) : markets.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-[#111] border border-[#1e1e1e] flex items-center justify-center mb-4">
-              <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#3f3f3f" strokeWidth="1.5">
-                <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <p className="text-sm font-semibold text-zinc-400 mb-1">No open markets</p>
-            <p className="text-xs text-zinc-600 mb-5 max-w-[220px]">
-              Join a group or create a market to start predicting.
-            </p>
-            <Link
-              href="/groups"
-              className="h-11 px-6 text-sm font-semibold bg-[#00d4a3] text-black rounded-xl flex items-center"
-            >
+            <p className="text-sm font-medium text-zinc-400 mb-1">No open markets</p>
+            <p className="text-xs text-zinc-600 mb-5">Join a group or create a market to start.</p>
+            <Link href="/groups" className="h-10 px-5 text-xs font-semibold bg-[#00d4a3] text-black rounded-lg">
               Go to Groups
             </Link>
           </div>
         ) : (
-          <div className="space-y-3">
-            {markets.map((m) => <MarketCard key={m.id} m={m} />)}
+          <div className="border border-[#1e1e1e] rounded-xl overflow-hidden">
+            {markets.map((m, i) => (
+              <MarketRow key={m.id} m={m} last={i === markets.length - 1} />
+            ))}
           </div>
         )}
       </main>
