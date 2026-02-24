@@ -32,14 +32,27 @@ export async function GET() {
   // Open markets in user's groups (status=open, close_time > now)
   const { data: openMarkets } = await supabase
     .from("markets")
-    .select("id, group_id, question, b_liquidity, q_yes, q_no, close_time, trade_count")
+    .select("id, group_id, question, b_liquidity, q_yes, q_no, close_time")
     .in("group_id", groupIds)
     .eq("status", "open")
     .gt("close_time", now)
     .order("close_time", { ascending: true });
 
-  // User's positions for those markets
   const openMarketIds = (openMarkets ?? []).map((m) => m.id);
+
+  // Count trades per market
+  const tradeCounts: Record<string, number> = {};
+  if (openMarketIds.length > 0) {
+    const { data: tradeRows } = await supabase
+      .from("trades")
+      .select("market_id")
+      .in("market_id", openMarketIds);
+    for (const t of tradeRows ?? []) {
+      tradeCounts[t.market_id] = (tradeCounts[t.market_id] ?? 0) + 1;
+    }
+  }
+
+  // User's positions for those markets
   let positionsByMarket: Record<string, { yes_shares: number; no_shares: number }> = {};
   if (openMarketIds.length > 0) {
     const { data: positions } = await supabase
@@ -68,7 +81,7 @@ export async function GET() {
       price_yes: priceYes(state).toDecimalPlaces(4).toNumber(),
       price_no: priceNo(state).toDecimalPlaces(4).toNumber(),
       close_time: m.close_time,
-      trade_count: m.trade_count ?? 0,
+      trade_count: tradeCounts[m.id] ?? 0,
       i_participated: yes_shares > 0 || no_shares > 0,
       my_yes_shares: yes_shares,
       my_no_shares: no_shares,
