@@ -18,16 +18,27 @@ html, body {
   overflow-x: hidden;
   background: var(--bg);
   color: var(--text);
+  /* Prevent bounce scroll revealing white background on iOS */
+  overscroll-behavior: none;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Remove 300ms tap delay on mobile */
+  touch-action: manipulation;
 }
 
 * {
   box-sizing: border-box;
+  /* Remove blue tap highlight on mobile */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Minimum touch target for standalone buttons */
+button:not([class]) {
+  min-height: 44px;
 }
 
 /* Remove native styling on date/time inputs for dark theme */

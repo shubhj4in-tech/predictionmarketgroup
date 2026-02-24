@@ -32,7 +32,7 @@ export async function GET() {
   // Open markets in user's groups (status=open, close_time > now)
   const { data: openMarkets } = await supabase
     .from("markets")
-    .select("id, group_id, question, b_liquidity, q_yes, q_no, close_time")
+    .select("id, group_id, question, b_liquidity, q_yes, q_no, close_time, trade_count")
     .in("group_id", groupIds)
     .eq("status", "open")
     .gt("close_time", now)
@@ -58,16 +58,20 @@ export async function GET() {
   const open_markets = (openMarkets ?? []).map((m) => {
     const state = { b: m.b_liquidity, q_yes: m.q_yes, q_no: m.q_no };
     const pos = positionsByMarket[m.id];
-    const i_participated =
-      (pos?.yes_shares ?? 0) > 0 || (pos?.no_shares ?? 0) > 0;
+    const yes_shares = pos?.yes_shares ?? 0;
+    const no_shares = pos?.no_shares ?? 0;
     return {
       id: m.id,
       group_id: m.group_id,
       group_name: groupNames[m.group_id] ?? "",
       question: m.question,
       price_yes: priceYes(state).toDecimalPlaces(4).toNumber(),
+      price_no: priceNo(state).toDecimalPlaces(4).toNumber(),
       close_time: m.close_time,
-      i_participated,
+      trade_count: m.trade_count ?? 0,
+      i_participated: yes_shares > 0 || no_shares > 0,
+      my_yes_shares: yes_shares,
+      my_no_shares: no_shares,
     };
   });
 
